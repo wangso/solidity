@@ -22,6 +22,8 @@
 #include <libdevcore/AnsiColorized.h>
 #include <libdevcore/CommonData.h>
 
+#include <json/json.h>
+
 #include <iosfwd>
 #include <numeric>
 #include <stdexcept>
@@ -145,6 +147,8 @@ public:
 	/// the actual result is used.
 	/// If _highlight is false, it's formatted without colorized highlighting. If it's true, AnsiColorized is
 	/// used to apply a colorized highlighting.
+	/// If test expectations do not match, the contract ABI is consulted in order to get the
+	/// right encoding for returned bytes, based on the parsed return types.
 	/// Reports warnings and errors to the error reporter.
 	std::string format(
 		ErrorReporter& _errorReporter,
@@ -172,6 +176,7 @@ public:
 	FunctionCall const& call() const { return m_call; }
 	void setFailure(const bool _failure) { m_failure = _failure; }
 	void setRawBytes(const bytes _rawBytes) { m_rawBytes = _rawBytes; }
+	void setContractABI(Json::Value _contractABI) { m_contractABI = std::move(_contractABI); }
 
 private:
 	/// Tries to format the given `bytes`, applying the detected ABI types that have be set for each parameter.
@@ -181,11 +186,22 @@ private:
 	std::string formatBytesParameters(
 		ErrorReporter& _errorReporter,
 		bytes const& _bytes,
-		ParameterList const& _params
+		std::string const& _signature,
+		ParameterList const& _params,
+		bool highlight = false
+	) const;
+
+	/// Formats a given _bytes applying the _abiType.
+	std::string formatBytesRange(
+		bytes const& _bytes,
+		ABIType const& _abiType
 	) const;
 
 	/// Formats the given parameters using their raw string representation.
-	std::string formatRawParameters(ParameterList const& _params, std::string const& _linePrefix = "") const;
+	std::string formatRawParameters(
+		ParameterList const& _params,
+		std::string const& _linePrefix = ""
+	) const;
 
 	/// Compares raw expectations (which are converted to a byte representation before),
 	/// and also the expected transaction status of the function call to the actual test results.
@@ -197,6 +213,9 @@ private:
 	bytes m_rawBytes = bytes{};
 	/// Transaction status of the actual call. False in case of a REVERT or any other failure.
 	bool m_failure = true;
+	/// JSON object which holds the contract ABI and that is used to set the output formatting
+	/// in the interactive update routine.
+	Json::Value m_contractABI;
 };
 
 }
