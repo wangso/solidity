@@ -53,6 +53,8 @@ public:
 	bool visit(Literal const& _literal) override;
 
 private:
+	std::string convertIfRequired(Expression const& _expression, Type const& _to);
+
 	std::ostringstream m_code;
 	IRGenerationContext& m_context;
 	YulUtilFunctions& m_utils;

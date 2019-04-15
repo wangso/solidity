@@ -77,6 +77,24 @@ private:
 }
 
 
+string IRGeneratorForStatements::convertIfRequired(Expression const& _expression, Type const& _to)
+{
+	ostringstream code;
+
+	Type const& from = *_expression.annotation().type;
+	string const& varName = m_context.variable(_expression);
+
+	if (from == _to)
+		code << varName << "\n";
+	else
+		code <<
+			m_utils.conversionFunction(from, _to) <<
+			"(" <<
+			varName <<
+			")\n";
+
+	return code.str();
+}
 
 bool IRGeneratorForStatements::visit(VariableDeclarationStatement const& _varDeclStatement)
 {
@@ -90,16 +108,13 @@ bool IRGeneratorForStatements::visit(VariableDeclarationStatement const& _varDec
 
 		expression->accept(*this);
 
-		solUnimplementedAssert(
-			*expression->annotation().type == *_varDeclStatement.declarations().front()->type(),
-			"Type conversion not yet implemented"
-		);
+		Type const& to = *_varDeclStatement.declarations().front()->type();
+
 		m_code <<
 			"let " <<
 			m_context.variableName(*_varDeclStatement.declarations().front()) <<
 			" := " <<
-			m_context.variable(*expression) <<
-			"\n";
+			convertIfRequired(*expression, to);
 	}
 	else
 		for (auto const& decl: _varDeclStatement.declarations())
@@ -115,14 +130,17 @@ bool IRGeneratorForStatements::visit(Assignment const& _assignment)
 
 	_assignment.rightHandSide().accept(*this);
 
-//	solUnimplementedAssert(
-//		*_assignment.rightHandSide().annotation().type == *_assignment.leftHandSide().annotation().type,
-//		"Type conversion not yet implemented"
-//	);
 	// TODO proper lvalue handling
 	auto const& identifier = dynamic_cast<Identifier const&>(_assignment.leftHandSide());
 	string varName = m_context.variableName(dynamic_cast<VariableDeclaration const&>(*identifier.annotation().referencedDeclaration));
-	m_code << varName << " := " << m_context.variable(_assignment.rightHandSide()) << "\n";
+
+	Type const& to   = *_assignment.leftHandSide().annotation().type;
+
+	m_code <<
+		varName <<
+		" := " <<
+		convertIfRequired(_assignment.rightHandSide(), to);
+
 	m_code << "let " << m_context.variable(_assignment) << " := " << varName << "\n";
 	return false;
 }
@@ -185,9 +203,11 @@ bool IRGeneratorForStatements::visit(FunctionCall const& _functionCall)
 		for (unsigned i = 0; i < arguments.size(); ++i)
 		{
 			arguments[i]->accept(*this);
-			// TODO convert
-			//utils().convertType(*arguments[i]->annotation().type, *function.parameterTypes()[i]);
-			args.emplace_back(m_context.variable(*arguments[i]));
+
+			if (functionType->takesArbitraryParameters())
+				args.emplace_back(m_context.variable(*arguments[i]));
+			else
+				args.emplace_back(convertIfRequired(*arguments[i], *parameterTypes[i]));
 		}
 
 		if (auto identifier = dynamic_cast<Identifier const*>(&_functionCall.expression()))
