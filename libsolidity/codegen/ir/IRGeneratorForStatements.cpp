@@ -174,8 +174,33 @@ void IRGeneratorForStatements::endVisit(BinaryOperation const& _binOp)
 
 bool IRGeneratorForStatements::visit(FunctionCall const& _functionCall)
 {
-	solUnimplementedAssert(_functionCall.annotation().kind == FunctionCallKind::FunctionCall, "");
-	FunctionTypePointer functionType = dynamic_cast<FunctionType const*>(_functionCall.expression().annotation().type);
+	solUnimplementedAssert(
+		_functionCall.annotation().kind == FunctionCallKind::FunctionCall ||
+		_functionCall.annotation().kind == FunctionCallKind::TypeConversion,
+		"This type of function call is not yet implemented"
+	);
+
+	TypePointer const funcType = _functionCall.expression().annotation().type;
+
+	if (_functionCall.annotation().kind == FunctionCallKind::TypeConversion)
+	{
+		solAssert(funcType->category() == Type::Category::TypeType, "Expected category to be TypeType");
+		solAssert(_functionCall.arguments().size() == 1, "Expected one argument for type conversion");
+		_functionCall.arguments().front()->accept(*this);
+
+		Type const& to = *dynamic_cast<TypeType const*>(funcType)->actualType();
+
+		m_code <<
+			"let " <<
+			m_context.variable(_functionCall) <<
+			" := " <<
+			convertIfRequired(*_functionCall.arguments().front(), to);
+
+		return false;
+	}
+
+	//FunctionTypePointer functionType = dynamic_pointer_cast<FunctionType const>(funcType);
+	FunctionTypePointer functionType = dynamic_cast<FunctionType const*>(funcType);
 
 	TypePointers parameterTypes = functionType->parameterTypes();
 	vector<ASTPointer<Expression const>> const& callArguments = _functionCall.arguments();
