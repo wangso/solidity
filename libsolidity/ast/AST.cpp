@@ -215,14 +215,14 @@ vector<Declaration const*> const& ContractDefinition::inheritableMembers() const
 {
 	if (!m_inheritableMembers)
 	{
-		set<string> memberSeen;
+		set<size_t> memberSeen;
 		m_inheritableMembers.reset(new vector<Declaration const*>());
 		auto addInheritableMember = [&](Declaration const* _decl)
 		{
 			solAssert(_decl, "addInheritableMember got a nullpointer.");
-			if (memberSeen.count(_decl->name()) == 0 && _decl->isVisibleInDerivedContracts())
+			if (memberSeen.count(_decl->id()) == 0 && _decl->isVisibleInDerivedContracts())
 			{
-				memberSeen.insert(_decl->name());
+				memberSeen.insert(_decl->id());
 				m_inheritableMembers->push_back(_decl);
 			}
 		};
